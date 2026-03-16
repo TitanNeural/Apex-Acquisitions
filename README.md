@@ -71,7 +71,7 @@ def generate_receptionist_response(message: str, customer_name: str | None = Non
 
     if any(word in msg for word in ["hello", "hi", "hey"]):
         return {
-            "response": f"Thank you for calling {business_name}. This is the AI receptionist. How can I help you today?",
+            "response": f"Thank you for calling {business_name}. This is Makayla. How can I help you today?",
             "next_step": "collect_issue"
         }
 
