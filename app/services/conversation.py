@@ -1,444 +1,241 @@
 """
-Conversation Manager - Core AI Receptionist Logic
-Handles conversation flow, context management, and AI responses
-Ready for integration with OpenAI GPT, Claude, or other LLMs
+Conversation Manager
+Orchestrates the full lifecycle of a customer call:
+  - Tracks conversation history per call
+  - Calls the Claude AI service for responses
+  - Merges extracted customer data across turns
+  - Decides next TwiML action
 """
 
-from typing import Dict, Optional, List
+import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-import logging
 from enum import Enum
+from typing import Dict, List, Optional, Any
+
+from app.services import ai_service
 
 logger = logging.getLogger(__name__)
 
-class ConversationState(str, Enum):
-    """Conversation states throughout the call"""
-    GREETING = "greeting"
-    CAPTURING_NAME = "capturing_name"
-    CAPTURING_PHONE = "capturing_phone"
-    CAPTURING_VEHICLE = "capturing_vehicle"
-    UNDERSTANDING_ISSUE = "understanding_issue"
-    RECOMMENDING_APPOINTMENT = "recommending_appointment"
-    SCHEDULING = "scheduling"
-    CONFIRMATION = "confirmation"
-    ENDED = "ended"
 
-@dataclass
-class ConversationResponse:
-    """Response from conversation manager"""
-    message: str
-    next_action: str
-    state: ConversationState
-    requires_human_handoff: bool = False
-    extracted_data: Dict = field(default_factory=dict)
+# ──────────────────────────────────────────────
+# Domain types
+# ──────────────────────────────────────────────
+
+class ConversationState(str, Enum):
+    ACTIVE = "active"
+    ENDED = "ended"
+    TRANSFERRED = "transferred"
+
 
 @dataclass
 class Conversation:
-    """Conversation session details"""
+    """Single phone-call session."""
     id: str
-    call_id: str
+    call_sid: str                       # Twilio CallSid
     caller_phone: str
-    caller_name: Optional[str] = None
-    channel: str = "phone"  # phone, sms, web
-    state: ConversationState = ConversationState.GREETING
+    channel: str = "phone"              # phone | sms | web
+    state: ConversationState = ConversationState.ACTIVE
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    messages: List[Dict] = field(default_factory=list)
-    customer_data: Dict = field(default_factory=dict)
-    
-    def to_dict(self):
+
+    # Full message history in Claude message format: [{"role": "user"|"assistant", "content": str}]
+    history: List[Dict] = field(default_factory=list)
+
+    # Structured data collected so far
+    customer_data: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
-            "call_id": self.call_id,
+            "call_sid": self.call_sid,
             "caller_phone": self.caller_phone,
-            "caller_name": self.caller_name,
             "channel": self.channel,
             "state": self.state.value,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "messages": self.messages,
-            "customer_data": self.customer_data
+            "turns": len([m for m in self.history if m["role"] == "user"]),
+            "customer_data": self.customer_data,
         }
+
+
+@dataclass
+class ConversationResponse:
+    """What the route handler needs to build the TwiML reply."""
+    message: str
+    next_action: str                    # "listen" | "end_call" | "transfer_to_human"
+    state: ConversationState
+    requires_human_handoff: bool = False
+    extracted_data: Dict = field(default_factory=dict)
+
+
+# ──────────────────────────────────────────────
+# Manager
+# ──────────────────────────────────────────────
 
 class ConversationManager:
     """
-    Manages conversation flow and AI receptionist interactions
-    
-    This is the core engine that orchestrates:
-    - Greeting and welcoming customers
-    - Capturing customer information
-    - Understanding service needs
-    - Recommending and scheduling appointments
-    - Handling conversation state transitions
-    
-    Ready to integrate with LLMs like OpenAI for natural language understanding
+    In-memory store of active conversations.
+    One instance is shared across all requests (singleton via dependency injection).
+    For production, replace the dict with Redis or a DB.
     """
-    
+
     def __init__(self):
-        """Initialize conversation manager"""
-        self.conversations: Dict[str, Conversation] = {}
+        self._conversations: Dict[str, Conversation] = {}   # keyed by call_sid
         self.receptionist_name = "Makayla"
-        
+
+    # ── lifecycle ──────────────────────────────
+
     def start_conversation(
         self,
-        call_id: str,
+        call_sid: str,
         caller_phone: str,
-        caller_name: Optional[str] = None,
-        channel: str = "phone"
+        channel: str = "phone",
     ) -> Conversation:
-        """
-        Start a new conversation session
-        
-        Args:
-            call_id: Unique call identifier
-            caller_phone: Customer's phone number
-            caller_name: Optional customer name (if available)
-            channel: Communication channel (phone, sms, web)
-        
-        Returns:
-            Conversation object
-        """
-        conversation_id = f"conv_{call_id}_{datetime.now().timestamp()}"
-        
-        conversation = Conversation(
-            id=conversation_id,
-            call_id=call_id,
+        conv = Conversation(
+            id=f"conv_{uuid.uuid4().hex[:8]}",
+            call_sid=call_sid,
             caller_phone=caller_phone,
-            caller_name=caller_name,
             channel=channel,
-            state=ConversationState.GREETING
         )
-        
-        self.conversations[call_id] = conversation
-        logger.info(f"Started conversation: {conversation_id}")
-        
-        return conversation
-    
-    def get_greeting(self, conversation_id: str) -> ConversationResponse:
-        """
-        Get initial greeting from AI receptionist
-        
-        Returns:
-            ConversationResponse with greeting message
-        """
-        # Lookup conversation by ID
-        call_id = None
-        for cid, conv in self.conversations.items():
-            if conv.id == conversation_id:
-                call_id = cid
-                break
-        
-        if not call_id:
-            logger.error(f"Conversation not found: {conversation_id}")
-            return ConversationResponse(
-                message="I'm sorry, I couldn't process your call. Please try again.",
-                next_action="end_call",
-                state=ConversationState.ENDED
-            )
-        
-        conversation = self.conversations[call_id]
-        conversation.state = ConversationState.CAPTURING_NAME
-        
-        # Greeting message from Makayla
-        greeting_message = (
-            f"Thank you for calling. This is {self.receptionist_name}. "
-            "How can I help you today?"
-        )
-        
-        # Add to message history
-        conversation.messages.append({
-            "timestamp": datetime.now().isoformat(),
-            "sender": "receptionist",
-            "message": greeting_message
-        })
-        
-        logger.info(f"Greeting sent for conversation: {conversation_id}")
-        
-        return ConversationResponse(
-            message=greeting_message,
-            next_action="listen",  # Listen for customer response
-            state=ConversationState.CAPTURING_NAME,
-            extracted_data={}
-        )
-    
-    def process_response(
-        self,
-        call_id: str,
-        user_input: str,
-        input_type: str = "speech"  # speech or text
-    ) -> ConversationResponse:
-        """
-        Process customer response and determine next action
-        
-        This method orchestrates the conversation flow:
-        1. Extract relevant information from user input
-        2. Determine current state and next state
-        3. Generate appropriate AI response
-        4. Update conversation context
-        
-        Args:
-            call_id: Unique call identifier
-            user_input: Customer's spoken or typed message
-            input_type: Type of input (speech or text)
-        
-        Returns:
-            ConversationResponse with next message and action
-        """
-        if call_id not in self.conversations:
-            logger.error(f"Call not found: {call_id}")
-            return ConversationResponse(
-                message="I'm sorry, I couldn't process that. Please try again.",
-                next_action="end_call",
-                state=ConversationState.ENDED
-            )
-        
-        conversation = self.conversations[call_id]
-        
-        # Add user message to history
-        conversation.messages.append({
-            "timestamp": datetime.now().isoformat(),
-            "sender": "customer",
-            "message": user_input,
-            "input_type": input_type
-        })
-        
-        # State machine: determine next state and action based on current state
-        if conversation.state == ConversationState.CAPTURING_NAME:
-            return self._handle_name_capture(conversation, user_input)
-        
-        elif conversation.state == ConversationState.CAPTURING_PHONE:
-            return self._handle_phone_capture(conversation, user_input)
-        
-        elif conversation.state == ConversationState.CAPTURING_VEHICLE:
-            return self._handle_vehicle_capture(conversation, user_input)
-        
-        elif conversation.state == ConversationState.UNDERSTANDING_ISSUE:
-            return self._handle_issue_understanding(conversation, user_input)
-        
-        elif conversation.state == ConversationState.RECOMMENDING_APPOINTMENT:
-            return self._handle_appointment_recommendation(conversation, user_input)
-        
-        elif conversation.state == ConversationState.SCHEDULING:
-            return self._handle_scheduling(conversation, user_input)
-        
-        else:
-            logger.warning(f"Unknown state: {conversation.state}")
-            return ConversationResponse(
-                message="I'm not sure how to help with that. Let me connect you with someone.",
-                next_action="transfer_to_human",
-                state=conversation.state,
-                requires_human_handoff=True
-            )
-    
-    def _handle_name_capture(
-        self,
-        conversation: Conversation,
-        user_input: str
-    ) -> ConversationResponse:
-        """Capture customer name"""
-        # TODO: Integrate with NLP/LLM to extract name from user input
-        # For now, treat entire input as potential name
-        name = user_input.strip()
-        
-        if len(name) > 2:  # Basic validation
-            conversation.customer_data["name"] = name
-            conversation.state = ConversationState.CAPTURING_PHONE
-            
-            response_message = (
-                f"Nice to meet you, {name}! "
-                "May I get your phone number to keep on file?"
-            )
-            
-            logger.info(f"Captured name: {name}")
-            
-            return ConversationResponse(
-                message=response_message,
-                next_action="listen",
-                state=ConversationState.CAPTURING_PHONE,
-                extracted_data={"name": name}
-            )
-        else:
-            return ConversationResponse(
-                message="I didn't quite catch that. Could you please tell me your name?",
-                next_action="listen",
-                state=ConversationState.CAPTURING_NAME
-            )
-    
-    def _handle_phone_capture(
-        self,
-        conversation: Conversation,
-        user_input: str
-    ) -> ConversationResponse:
-        """Capture customer phone number"""
-        # TODO: Integrate with NLP/LLM to extract phone number
-        # For now, extract digits from input
-        phone = ''.join(filter(str.isdigit, user_input))
-        
-        if len(phone) >= 10:  # Basic phone validation
-            conversation.customer_data["phone"] = phone
-            conversation.state = ConversationState.CAPTURING_VEHICLE
-            
-            response_message = (
-                "Great! Now, could you tell me what vehicle brings you in today? "
-                "For example, the year, make, and model?"
-            )
-            
-            logger.info(f"Captured phone: {phone}")
-            
-            return ConversationResponse(
-                message=response_message,
-                next_action="listen",
-                state=ConversationState.CAPTURING_VEHICLE,
-                extracted_data={"phone": phone}
-            )
-        else:
-            return ConversationResponse(
-                message="I didn't catch that phone number. Could you please repeat it?",
-                next_action="listen",
-                state=ConversationState.CAPTURING_PHONE
-            )
-    
-    def _handle_vehicle_capture(
-        self,
-        conversation: Conversation,
-        user_input: str
-    ) -> ConversationResponse:
-        """Capture vehicle information"""
-        # TODO: Integrate with NLP/LLM to parse vehicle details
-        conversation.customer_data["vehicle"] = user_input.strip()
-        conversation.state = ConversationState.UNDERSTANDING_ISSUE
-        
-        response_message = (
-            f"Thank you, a {user_input.strip()}. "
-            "What seems to be the issue with your vehicle?"
-        )
-        
-        logger.info(f"Captured vehicle: {user_input}")
-        
-        return ConversationResponse(
-            message=response_message,
-            next_action="listen",
-            state=ConversationState.UNDERSTANDING_ISSUE,
-            extracted_data={"vehicle": user_input.strip()}
-        )
-    
-    def _handle_issue_understanding(
-        self,
-        conversation: Conversation,
-        user_input: str
-    ) -> ConversationResponse:
-        """Understand customer's issue"""
-        # TODO: Integrate with OpenAI or Claude to understand issue
-        # Determine service category and urgency
-        conversation.customer_data["issue"] = user_input.strip()
-        conversation.state = ConversationState.RECOMMENDING_APPOINTMENT
-        
-        response_message = (
-            "I understand. We can definitely help with that. "
-            "I'd like to schedule an appointment for you. "
-            "What day would work best for you?"
-        )
-        
-        logger.info(f"Understood issue: {user_input}")
-        
-        return ConversationResponse(
-            message=response_message,
-            next_action="listen",
-            state=ConversationState.RECOMMENDING_APPOINTMENT,
-            extracted_data={"issue": user_input.strip()}
-        )
-    
-    def _handle_appointment_recommendation(
-        self,
-        conversation: Conversation,
-        user_input: str
-    ) -> ConversationResponse:
-        """Handle appointment recommendation and preference"""
-        conversation.customer_data["preferred_date"] = user_input.strip()
-        conversation.state = ConversationState.SCHEDULING
-        
-        response_message = (
-            f"Perfect! I'll check our availability for {user_input.strip()}. "
-            "What time works best for you?"
-        )
-        
-        return ConversationResponse(
-            message=response_message,
-            next_action="listen",
-            state=ConversationState.SCHEDULING,
-            extracted_data={"preferred_date": user_input.strip()}
-        )
-    
-    def _handle_scheduling(
-        self,
-        conversation: Conversation,
-        user_input: str
-    ) -> ConversationResponse:
-        """Complete appointment scheduling"""
-        # TODO: Integrate with Google Calendar, Calendly, or custom scheduling API
-        conversation.customer_data["preferred_time"] = user_input.strip()
-        conversation.state = ConversationState.CONFIRMATION
-        
-        response_message = (
-            f"Excellent! I've scheduled your appointment for "
-            f"{conversation.customer_data.get('preferred_date')} "
-            f'at {user_input.strip()}. "
-            f"We'll see you then! Is there anything else I can help with?"
-        )
-        
-        logger.info(f"Appointment scheduled for: {conversation.customer_data}")
-        
-        return ConversationResponse(
-            message=response_message,
-            next_action="listen",
-            state=ConversationState.CONFIRMATION,
-            extracted_data={"preferred_time": user_input.strip()}
-        )
-    
-    def end_conversation(self, call_id: str) -> Dict:
-        """
-        End conversation and save data
-        
-        Args:
-            call_id: Unique call identifier
-        
-        Returns:
-            Conversation summary
-        """
-        if call_id not in self.conversations:
-            return {"status": "not_found"}
-        
-        conversation = self.conversations[call_id]
-        conversation.state = ConversationState.ENDED
-        conversation.updated_at = datetime.now()
-        
-        summary = {
-            "call_id": call_id,
-            "conversation_id": conversation.id,
-            "duration": (conversation.updated_at - conversation.created_at).total_seconds(),
-            "customer_data": conversation.customer_data,
-            "messages_count": len(conversation.messages),
-            "status": "completed"
-        }
-        
-        logger.info(f"Conversation ended: {call_id}")
-        # TODO: Save conversation data to database
-        
-        return summary
-    
-    def get_conversation_status(self, call_id: str) -> Optional[Dict]:
-        """
-        Get conversation status and details
-        
-        Args:
-            call_id: Unique call identifier
-        
-        Returns:
-            Conversation status or None if not found
-        """
-        if call_id not in self.conversations:
+        self._conversations[call_sid] = conv
+        logger.info("New conversation started: %s | caller=%s", conv.id, caller_phone)
+        return conv
+
+    def get_conversation(self, call_sid: str) -> Optional[Conversation]:
+        return self._conversations.get(call_sid)
+
+    def end_conversation(self, call_sid: str) -> Optional[dict]:
+        conv = self._conversations.get(call_sid)
+        if not conv:
             return None
-        
-        conversation = self.conversations[call_id]
-        return conversation.to_dict()
+        conv.state = ConversationState.ENDED
+        conv.updated_at = datetime.now()
+        summary = {
+            "call_sid": call_sid,
+            "conversation_id": conv.id,
+            "duration_seconds": (conv.updated_at - conv.created_at).total_seconds(),
+            "customer_data": conv.customer_data,
+            "turns": len([m for m in conv.history if m["role"] == "user"]),
+            "status": "ended",
+        }
+        logger.info("Conversation ended: %s | data=%s", conv.id, conv.customer_data)
+        return summary
+
+    # ── core interaction ───────────────────────
+
+    def get_greeting(self, call_sid: str) -> ConversationResponse:
+        """
+        Generate Makayla's opening line for a brand-new call.
+        """
+        conv = self._conversations.get(call_sid)
+        if not conv:
+            return self._error_response()
+
+        ai_result = ai_service.generate_greeting()
+        message = ai_result["message"]
+
+        # Store assistant turn in history
+        conv.history.append({"role": "assistant", "content": message})
+        conv.updated_at = datetime.now()
+
+        return ConversationResponse(
+            message=message,
+            next_action="listen",
+            state=conv.state,
+        )
+
+    def process_input(self, call_sid: str, user_text: str) -> ConversationResponse:
+        """
+        Process what the caller just said and generate Makayla's reply.
+        """
+        conv = self._conversations.get(call_sid)
+        if not conv:
+            return self._error_response()
+
+        if conv.state != ConversationState.ACTIVE:
+            return ConversationResponse(
+                message="Thank you for calling. Have a great day!",
+                next_action="end_call",
+                state=conv.state,
+            )
+
+        # Append caller turn
+        conv.history.append({"role": "user", "content": user_text})
+
+        # Ask Claude for a response
+        ai_result = ai_service.generate_response(
+            conversation_history=conv.history,
+            current_customer_data=conv.customer_data,
+        )
+
+        message = ai_result.get("message", "I'm sorry, could you repeat that?")
+        next_action = ai_result.get("next_action", "listen")
+        handoff = ai_result.get("requires_human_handoff", False)
+        end_call = ai_result.get("end_call", False)
+        extracted = ai_result.get("extracted", {})
+
+        # Merge extracted fields (only non-null values)
+        for key, value in extracted.items():
+            if value is not None and value != "":
+                conv.customer_data[key] = value
+
+        # Append assistant turn
+        conv.history.append({"role": "assistant", "content": message})
+        conv.updated_at = datetime.now()
+
+        # Resolve final action
+        if handoff:
+            next_action = "transfer_to_human"
+            conv.state = ConversationState.TRANSFERRED
+        elif end_call or next_action == "end_call":
+            next_action = "end_call"
+            conv.state = ConversationState.ENDED
+
+        logger.info(
+            "Turn processed: conv=%s | action=%s | data=%s",
+            conv.id,
+            next_action,
+            conv.customer_data,
+        )
+
+        return ConversationResponse(
+            message=message,
+            next_action=next_action,
+            state=conv.state,
+            requires_human_handoff=handoff,
+            extracted_data=extracted,
+        )
+
+    # ── admin helpers ──────────────────────────
+
+    def get_all_conversations(self) -> list[dict]:
+        return [c.to_dict() for c in self._conversations.values()]
+
+    def get_conversation_detail(self, call_sid: str) -> Optional[dict]:
+        conv = self._conversations.get(call_sid)
+        if not conv:
+            return None
+        d = conv.to_dict()
+        d["history"] = conv.history
+        return d
+
+    # ── internals ─────────────────────────────
+
+    @staticmethod
+    def _error_response() -> ConversationResponse:
+        return ConversationResponse(
+            message=(
+                "I'm so sorry, I'm having trouble with your call right now. "
+                "Please try calling back in just a moment."
+            ),
+            next_action="end_call",
+            state=ConversationState.ENDED,
+        )
+
+
+# ──────────────────────────────────────────────
+# Shared singleton
+# ──────────────────────────────────────────────
+conversation_manager = ConversationManager()

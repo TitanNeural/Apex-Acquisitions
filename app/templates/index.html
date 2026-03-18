@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ business_name }} – Makayla Dashboard</title>
+  <style>
+    /* ── Reset & Base ────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:   #e63946;   /* EAS red */
+      --dark:    #1d1d2c;
+      --mid:     #2b2b3b;
+      --light:   #f1f1f1;
+      --muted:   #888;
+      --accent:  #4cc9f0;
+      --green:   #06d6a0;
+      --radius:  10px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--dark);
+      color: var(--light);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────── */
+    header {
+      background: var(--brand);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.4);
+    }
+    header .logo { font-size: 2rem; }
+    header h1   { font-size: 1.4rem; font-weight: 700; }
+    header span { font-size: .9rem; opacity: .8; }
+
+    /* ── Layout ─────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    /* ── Stats row ──────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--mid);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      text-align: center;
+    }
+    .stat-card .value { font-size: 2.4rem; font-weight: 800; color: var(--accent); }
+    .stat-card .label { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Chat tester ────────────────────── */
+    .chat-section {
+      background: var(--mid);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+    .chat-section h2 { font-size: 1.1rem; margin-bottom: 16px; color: var(--accent); }
+    #chat-box {
+      background: var(--dark);
+      border-radius: 8px;
+      padding: 16px;
+      height: 260px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .msg { max-width: 78%; padding: 10px 14px; border-radius: 18px; font-size: .9rem; line-height: 1.4; }
+    .msg.makayla  { background: var(--brand); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .msg.customer { background: #3a3a55; align-self: flex-end; border-bottom-right-radius: 4px; }
+
+    .chat-input { display: flex; gap: 8px; }
+    .chat-input input {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: var(--dark);
+      color: var(--light);
+      font-size: .95rem;
+    }
+    .chat-input input:focus { outline: none; border-color: var(--accent); }
+    .chat-input button {
+      padding: 10px 20px;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background .2s;
+    }
+    .chat-input button:hover { background: #c1121f; }
+
+    /* ── Conversations table ────────────── */
+    .table-section h2 { font-size: 1.1rem; margin-bottom: 14px; color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--mid);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    th, td { padding: 12px 16px; text-align: left; font-size: .875rem; }
+    th { background: #1a1a2e; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    tr:not(:last-child) td { border-bottom: 1px solid #333; }
+    tr:hover td { background: #333348; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 600;
+    }
+    .badge-active      { background: #06d6a022; color: var(--green); }
+    .badge-ended       { background: #44445566; color: var(--muted); }
+    .badge-transferred { background: #e6394622; color: var(--brand); }
+
+    .empty { text-align: center; padding: 48px; color: var(--muted); }
+
+    /* ── Footer ─────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🚗</div>
+  <div>
+    <h1>{{ business_name }}</h1>
+    <span>AI Receptionist · <strong>Makayla</strong> · Live Dashboard</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Stats ─────────────────────────── -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="value">{{ total }}</div>
+      <div class="label">Total Calls</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ conversations | selectattr('state', 'equalto', 'active') | list | length }}</div>
+      <div class="label">Active Right Now</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ conversations | selectattr('state', 'equalto', 'ended') | list | length }}</div>
+      <div class="label">Completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ conversations | selectattr('customer_data.appointment_date', 'defined') | list | length }}</div>
+      <div class="label">Appts Booked</div>
+    </div>
+  </div>
+
+  <!-- ── Live Chat Tester ───────────────── -->
+  <div class="chat-section">
+    <h2>💬 Test Makayla (Text Chat)</h2>
+    <div id="chat-box">
+      <div class="msg makayla">Click <strong>Start</strong> to begin a test conversation with Makayla.</div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="user-input" placeholder="Type your message …" onkeydown="if(event.key==='Enter') sendMsg()" />
+      <button onclick="startChat()" id="start-btn">Start</button>
+      <button onclick="sendMsg()" id="send-btn" style="display:none">Send</button>
+    </div>
+  </div>
+
+  <!-- ── Conversations Table ───────────── -->
+  <div class="table-section">
+    <h2>📋 Recent Conversations</h2>
+    {% if conversations %}
+    <table>
+      <thead>
+        <tr>
+          <th>Call SID</th>
+          <th>Caller</th>
+          <th>Channel</th>
+          <th>Status</th>
+          <th>Turns</th>
+          <th>Name</th>
+          <th>Vehicle</th>
+          <th>Service</th>
+          <th>Appointment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in conversations %}
+        <tr>
+          <td><code style="font-size:.8rem">{{ c.call_sid[:20] }}…</code></td>
+          <td>{{ c.caller_phone }}</td>
+          <td>{{ c.channel }}</td>
+          <td>
+            <span class="badge badge-{{ c.state }}">{{ c.state }}</span>
+          </td>
+          <td>{{ c.turns }}</td>
+          <td>{{ c.customer_data.get('name', '—') }}</td>
+          <td>{{ c.customer_data.get('vehicle', '—') }}</td>
+          <td>{{ c.customer_data.get('service_issue', '—') }}</td>
+          <td>
+            {% if c.customer_data.get('appointment_date') %}
+              {{ c.customer_data.appointment_date }}
+              {% if c.customer_data.get('appointment_time') %}
+                @ {{ c.customer_data.appointment_time }}
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No conversations yet. Call the Twilio number or use the chat tester above.</div>
+    {% endif %}
+  </div>
+
+</main>
+
+<footer>
+  {{ business_name }} · Powered by Makayla AI (Claude + Twilio) · <a href="/docs" style="color:var(--accent)">API Docs</a>
+</footer>
+
+<script>
+  let callSid = null;
+
+  async function startChat() {
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('send-btn').style.display = 'inline-block';
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    callSid = data.call_sid;
+    appendMsg('makayla', data.message);
+  }
+
+  async function sendMsg() {
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    appendMsg('customer', text);
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: text, call_sid: callSid })
+    });
+    const data = await res.json();
+    appendMsg('makayla', data.message);
+
+    if (data.next_action === 'end_call' || data.next_action === 'transfer_to_human') {
+      appendMsg('makayla', '— Call ended —');
+      document.getElementById('send-btn').style.display = 'none';
+      document.getElementById('start-btn').style.display = 'inline-block';
+      document.getElementById('start-btn').textContent = 'New Chat';
+      callSid = null;
+    }
+  }
+
+  function appendMsg(role, text) {
+    const box = document.getElementById('chat-box');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+</script>
+
+</body>
+</html>
