@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Chat with Makayla{% endblock %}
+
+{% block content %}
+<section class="chat-page">
+    <div class="container">
+        <h1>Chat with Makayla</h1>
+        <p class="subtitle">Your AI receptionist is ready to help.</p>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="chat-avatar">M</div>
+                <div class="chat-header-info">
+                    <h3>Makayla</h3>
+                    <p>Online</p>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="typing-indicator" id="typingIndicator">Makayla is typing...</div>
+            </div>
+
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="Type your message..." autocomplete="off"
+                       onkeydown="if(event.key==='Enter')sendChat()">
+                <button onclick="sendChat()" title="Send">&#10148;</button>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let callId = null;
+const messagesEl = document.getElementById('chatMessages');
+const inputEl = document.getElementById('chatInput');
+const typingEl = document.getElementById('typingIndicator');
+
+function addMessage(text, sender) {
+    const div = document.createElement('div');
+    div.className = 'message ' + sender;
+    div.textContent = text;
+    messagesEl.insertBefore(div, typingEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showTyping(show) {
+    typingEl.style.display = show ? 'block' : 'none';
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function startChat() {
+    showTyping(true);
+    try {
+        const res = await fetch('/api/conversation/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caller_phone: 'web-visitor', channel: 'web' })
+        });
+        const data = await res.json();
+        callId = data.call_id;
+        showTyping(false);
+        addMessage(data.greeting, 'bot');
+    } catch {
+        showTyping(false);
+        addMessage('Sorry, I could not connect. Please try again.', 'bot');
+    }
+}
+
+async function sendChat() {
+    const text = inputEl.value.trim();
+    if (!text || !callId) return;
+    inputEl.value = '';
+    addMessage(text, 'user');
+    showTyping(true);
+
+    try {
+        const res = await fetch('/api/conversation/message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ call_id: callId, message: text })
+        });
+        const data = await res.json();
+        showTyping(false);
+        addMessage(data.message, 'bot');
+    } catch {
+        showTyping(false);
+        addMessage('Sorry, something went wrong. Please try again.', 'bot');
+    }
+}
+
+startChat();
+inputEl.focus();
+</script>
+{% endblock %}

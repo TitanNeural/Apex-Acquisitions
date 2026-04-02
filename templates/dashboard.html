@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - ApexAcquisitions{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+    <div class="container">
+        <h1>Welcome, <span id="userName">...</span></h1>
+        <p class="subtitle">Your deal pipeline at a glance.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="statProperties">0</div>
+                <div class="stat-label">Properties Saved</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statDeals">0</div>
+                <div class="stat-label">Active Deals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statMatches">0</div>
+                <div class="stat-label">Investor Matches</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statClosed">0</div>
+                <div class="stat-label">Deals Closed</div>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>Quick Actions</h2>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <a href="/properties" class="btn btn-primary">Search Properties</a>
+                <a href="/deals" class="btn btn-outline">View Deals</a>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>Recent Activity</h2>
+            <ul class="activity-list" id="activityList">
+                <li>
+                    <span>No recent activity yet. Start by searching for properties.</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadProfile() {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+
+    try {
+        const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Unauthorized');
+        const user = await res.json();
+        document.getElementById('userName').textContent = user.first_name;
+    } catch {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+    }
+}
+
+loadProfile();
+</script>
+{% endblock %}
