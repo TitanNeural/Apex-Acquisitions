@@ -21,7 +21,7 @@ uvicorn
 python-dotenv
 pydantic
 APP_NAME=AI Receptionist
-BUSINESS_NAME=EAS Tire and Auto
+BUSINESS_NAME=ApexAcquisitions
 from fastapi import FastAPI
 from dotenv import load_dotenv
 import os
