@@ -1,5 +1,5 @@
 """
-Conversation routes - AI receptionist chat endpoints.
+Conversation routes - lead intake endpoints.
 """
 
 from typing import Optional

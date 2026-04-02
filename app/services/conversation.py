@@ -1,6 +1,7 @@
 """
-Conversation Manager - Core AI Receptionist Logic
+Conversation Manager - Core Lead Intake Logic for ApexAcquisitions
 Handles conversation flow, context management, and AI responses
+for real estate wholesaling lead qualification.
 Ready for integration with OpenAI GPT, Claude, or other LLMs
 """
 
@@ -17,10 +18,10 @@ class ConversationState(str, Enum):
     GREETING = "greeting"
     CAPTURING_NAME = "capturing_name"
     CAPTURING_PHONE = "capturing_phone"
-    CAPTURING_VEHICLE = "capturing_vehicle"
-    UNDERSTANDING_ISSUE = "understanding_issue"
-    RECOMMENDING_APPOINTMENT = "recommending_appointment"
-    SCHEDULING = "scheduling"
+    CAPTURING_PROPERTY = "capturing_property"
+    UNDERSTANDING_SITUATION = "understanding_situation"
+    QUALIFYING_MOTIVATION = "qualifying_motivation"
+    COLLECTING_DETAILS = "collecting_details"
     CONFIRMATION = "confirmation"
     ENDED = "ended"
 
@@ -46,7 +47,7 @@ class Conversation:
     updated_at: datetime = field(default_factory=datetime.now)
     messages: List[Dict] = field(default_factory=list)
     customer_data: Dict = field(default_factory=dict)
-    
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -63,23 +64,24 @@ class Conversation:
 
 class ConversationManager:
     """
-    Manages conversation flow and AI receptionist interactions
-    
+    Manages conversation flow and lead intake interactions
+    for ApexAcquisitions real estate wholesaling platform.
+
     This is the core engine that orchestrates:
-    - Greeting and welcoming customers
-    - Capturing customer information
-    - Understanding service needs
-    - Recommending and scheduling appointments
+    - Greeting and welcoming sellers
+    - Capturing seller information
+    - Understanding property situation and motivation
+    - Qualifying leads for wholesaling deals
     - Handling conversation state transitions
-    
-    Ready to integrate with LLMs like OpenAI for natural language understanding
+
+    Ready to integrate with LLMs like OpenAI or Claude for natural language understanding
     """
-    
+
     def __init__(self):
         """Initialize conversation manager"""
         self.conversations: Dict[str, Conversation] = {}
         self.receptionist_name = "Makayla"
-        
+
     def start_conversation(
         self,
         call_id: str,
@@ -89,18 +91,18 @@ class ConversationManager:
     ) -> Conversation:
         """
         Start a new conversation session
-        
+
         Args:
             call_id: Unique call identifier
-            caller_phone: Customer's phone number
-            caller_name: Optional customer name (if available)
+            caller_phone: Caller's phone number
+            caller_name: Optional caller name (if available)
             channel: Communication channel (phone, sms, web)
-        
+
         Returns:
             Conversation object
         """
         conversation_id = f"conv_{call_id}_{datetime.now().timestamp()}"
-        
+
         conversation = Conversation(
             id=conversation_id,
             call_id=call_id,
@@ -109,16 +111,16 @@ class ConversationManager:
             channel=channel,
             state=ConversationState.GREETING
         )
-        
+
         self.conversations[call_id] = conversation
         logger.info(f"Started conversation: {conversation_id}")
-        
+
         return conversation
-    
+
     def get_greeting(self, conversation_id: str) -> ConversationResponse:
         """
-        Get initial greeting from AI receptionist
-        
+        Get initial greeting for lead intake
+
         Returns:
             ConversationResponse with greeting message
         """
@@ -128,7 +130,7 @@ class ConversationManager:
             if conv.id == conversation_id:
                 call_id = cid
                 break
-        
+
         if not call_id:
             logger.error(f"Conversation not found: {conversation_id}")
             return ConversationResponse(
@@ -136,32 +138,32 @@ class ConversationManager:
                 next_action="end_call",
                 state=ConversationState.ENDED
             )
-        
+
         conversation = self.conversations[call_id]
         conversation.state = ConversationState.CAPTURING_NAME
-        
+
         # Greeting message from Makayla
         greeting_message = (
-            f"Thank you for calling. This is {self.receptionist_name}. "
-            "How can I help you today?"
+            f"Hi there! This is {self.receptionist_name} with ApexAcquisitions. "
+            "We help property owners find solutions. What's your name?"
         )
-        
+
         # Add to message history
         conversation.messages.append({
             "timestamp": datetime.now().isoformat(),
             "sender": "receptionist",
             "message": greeting_message
         })
-        
+
         logger.info(f"Greeting sent for conversation: {conversation_id}")
-        
+
         return ConversationResponse(
             message=greeting_message,
-            next_action="listen",  # Listen for customer response
+            next_action="listen",
             state=ConversationState.CAPTURING_NAME,
             extracted_data={}
         )
-    
+
     def process_response(
         self,
         call_id: str,
@@ -169,19 +171,19 @@ class ConversationManager:
         input_type: str = "speech"  # speech or text
     ) -> ConversationResponse:
         """
-        Process customer response and determine next action
-        
+        Process caller response and determine next action
+
         This method orchestrates the conversation flow:
         1. Extract relevant information from user input
         2. Determine current state and next state
         3. Generate appropriate AI response
         4. Update conversation context
-        
+
         Args:
             call_id: Unique call identifier
-            user_input: Customer's spoken or typed message
+            user_input: Caller's spoken or typed message
             input_type: Type of input (speech or text)
-        
+
         Returns:
             ConversationResponse with next message and action
         """
@@ -192,66 +194,65 @@ class ConversationManager:
                 next_action="end_call",
                 state=ConversationState.ENDED
             )
-        
+
         conversation = self.conversations[call_id]
-        
+
         # Add user message to history
         conversation.messages.append({
             "timestamp": datetime.now().isoformat(),
-            "sender": "customer",
+            "sender": "caller",
             "message": user_input,
             "input_type": input_type
         })
-        
+
         # State machine: determine next state and action based on current state
         if conversation.state == ConversationState.CAPTURING_NAME:
             return self._handle_name_capture(conversation, user_input)
-        
+
         elif conversation.state == ConversationState.CAPTURING_PHONE:
             return self._handle_phone_capture(conversation, user_input)
-        
-        elif conversation.state == ConversationState.CAPTURING_VEHICLE:
-            return self._handle_vehicle_capture(conversation, user_input)
-        
-        elif conversation.state == ConversationState.UNDERSTANDING_ISSUE:
-            return self._handle_issue_understanding(conversation, user_input)
-        
-        elif conversation.state == ConversationState.RECOMMENDING_APPOINTMENT:
-            return self._handle_appointment_recommendation(conversation, user_input)
-        
-        elif conversation.state == ConversationState.SCHEDULING:
-            return self._handle_scheduling(conversation, user_input)
-        
+
+        elif conversation.state == ConversationState.CAPTURING_PROPERTY:
+            return self._handle_property_capture(conversation, user_input)
+
+        elif conversation.state == ConversationState.UNDERSTANDING_SITUATION:
+            return self._handle_situation_understanding(conversation, user_input)
+
+        elif conversation.state == ConversationState.QUALIFYING_MOTIVATION:
+            return self._handle_motivation_qualifying(conversation, user_input)
+
+        elif conversation.state == ConversationState.COLLECTING_DETAILS:
+            return self._handle_detail_collection(conversation, user_input)
+
         else:
             logger.warning(f"Unknown state: {conversation.state}")
             return ConversationResponse(
-                message="I'm not sure how to help with that. Let me connect you with someone.",
+                message="I appreciate your time. Let me have one of our acquisitions managers reach out to you directly.",
                 next_action="transfer_to_human",
                 state=conversation.state,
                 requires_human_handoff=True
             )
-    
+
     def _handle_name_capture(
         self,
         conversation: Conversation,
         user_input: str
     ) -> ConversationResponse:
-        """Capture customer name"""
+        """Capture caller name"""
         # TODO: Integrate with NLP/LLM to extract name from user input
-        # For now, treat entire input as potential name
         name = user_input.strip()
-        
-        if len(name) > 2:  # Basic validation
+
+        if len(name) > 2:
             conversation.customer_data["name"] = name
             conversation.state = ConversationState.CAPTURING_PHONE
-            
+
             response_message = (
                 f"Nice to meet you, {name}! "
-                "May I get your phone number to keep on file?"
+                "What's the best phone number to reach you at?"
             )
-            
+
             logger.info(f"Captured name: {name}")
-            
+
             return ConversationResponse(
                 message=response_message,
                 next_action="listen",
@@ -264,32 +265,30 @@ class ConversationManager:
                 next_action="listen",
                 state=ConversationState.CAPTURING_NAME
             )
-    
+
     def _handle_phone_capture(
         self,
         conversation: Conversation,
         user_input: str
     ) -> ConversationResponse:
-        """Capture customer phone number"""
+        """Capture caller phone number"""
         # TODO: Integrate with NLP/LLM to extract phone number
-        # For now, extract digits from input
         phone = ''.join(filter(str.isdigit, user_input))
-        
-        if len(phone) >= 10:  # Basic phone validation
+
+        if len(phone) >= 10:
             conversation.customer_data["phone"] = phone
-            conversation.state = ConversationState.CAPTURING_VEHICLE
-            
+            conversation.state = ConversationState.CAPTURING_PROPERTY
+
             response_message = (
-                "Great! Now, could you tell me what vehicle brings you in today? "
-                "For example, the year, make, and model?"
+                "Got it! Now, what's the address of the property you're looking to sell?"
             )
-            
+
             logger.info(f"Captured phone: {phone}")
-            
+
             return ConversationResponse(
                 message=response_message,
                 next_action="listen",
-                state=ConversationState.CAPTURING_VEHICLE,
+                state=ConversationState.CAPTURING_PROPERTY,
                 extracted_data={"phone": phone}
             )
         else:
@@ -298,121 +297,119 @@ class ConversationManager:
                 next_action="listen",
                 state=ConversationState.CAPTURING_PHONE
             )
-    
-    def _handle_vehicle_capture(
+
+    def _handle_property_capture(
         self,
         conversation: Conversation,
         user_input: str
     ) -> ConversationResponse:
-        """Capture vehicle information"""
-        # TODO: Integrate with NLP/LLM to parse vehicle details
-        conversation.customer_data["vehicle"] = user_input.strip()
-        conversation.state = ConversationState.UNDERSTANDING_ISSUE
-        
+        """Capture property address"""
+        # TODO: Integrate with NLP/LLM to parse and validate address
+        conversation.customer_data["property_address"] = user_input.strip()
+        conversation.state = ConversationState.UNDERSTANDING_SITUATION
+
         response_message = (
-            f"Thank you, a {user_input.strip()}. "
-            "What seems to be the issue with your vehicle?"
+            f"Thank you! And what's the current situation with the property? "
+            "For example, is it occupied, vacant, or do you have tenants?"
         )
-        
-        logger.info(f"Captured vehicle: {user_input}")
-        
+
+        logger.info(f"Captured property address: {user_input}")
+
         return ConversationResponse(
             message=response_message,
             next_action="listen",
-            state=ConversationState.UNDERSTANDING_ISSUE,
-            extracted_data={"vehicle": user_input.strip()}
+            state=ConversationState.UNDERSTANDING_SITUATION,
+            extracted_data={"property_address": user_input.strip()}
         )
-    
-    def _handle_issue_understanding(
+
+    def _handle_situation_understanding(
         self,
         conversation: Conversation,
         user_input: str
     ) -> ConversationResponse:
-        """Understand customer's issue"""
-        # TODO: Integrate with OpenAI or Claude to understand issue
-        # Determine service category and urgency
-        conversation.customer_data["issue"] = user_input.strip()
-        conversation.state = ConversationState.RECOMMENDING_APPOINTMENT
-        
+        """Understand the property situation"""
+        # TODO: Integrate with LLM to classify situation and distress signals
+        conversation.customer_data["property_situation"] = user_input.strip()
+        conversation.state = ConversationState.QUALIFYING_MOTIVATION
+
         response_message = (
-            "I understand. We can definitely help with that. "
-            "I'd like to schedule an appointment for you. "
-            "What day would work best for you?"
+            "I appreciate you sharing that. What's your main reason for considering selling? "
+            "And do you have a timeline in mind?"
         )
-        
-        logger.info(f"Understood issue: {user_input}")
-        
+
+        logger.info(f"Captured situation: {user_input}")
+
         return ConversationResponse(
             message=response_message,
             next_action="listen",
-            state=ConversationState.RECOMMENDING_APPOINTMENT,
-            extracted_data={"issue": user_input.strip()}
+            state=ConversationState.QUALIFYING_MOTIVATION,
+            extracted_data={"property_situation": user_input.strip()}
         )
-    
-    def _handle_appointment_recommendation(
+
+    def _handle_motivation_qualifying(
         self,
         conversation: Conversation,
         user_input: str
     ) -> ConversationResponse:
-        """Handle appointment recommendation and preference"""
-        conversation.customer_data["preferred_date"] = user_input.strip()
-        conversation.state = ConversationState.SCHEDULING
-        
+        """Qualify seller motivation and timeline"""
+        conversation.customer_data["motivation"] = user_input.strip()
+        conversation.state = ConversationState.COLLECTING_DETAILS
+
         response_message = (
-            f"Perfect! I'll check our availability for {user_input.strip()}. "
-            "What time works best for you?"
+            "That's really helpful. Last question \u2014 do you have a price in mind, "
+            "or would you like us to make you a fair cash offer?"
         )
-        
+
         return ConversationResponse(
             message=response_message,
             next_action="listen",
-            state=ConversationState.SCHEDULING,
-            extracted_data={"preferred_date": user_input.strip()}
+            state=ConversationState.COLLECTING_DETAILS,
+            extracted_data={"motivation": user_input.strip()}
         )
-    
-    def _handle_scheduling(
+
+    def _handle_detail_collection(
         self,
         conversation: Conversation,
         user_input: str
     ) -> ConversationResponse:
-        """Complete appointment scheduling"""
-        # TODO: Integrate with Google Calendar, Calendly, or custom scheduling API
-        conversation.customer_data["preferred_time"] = user_input.strip()
+        """Collect asking price or offer preference"""
+        # TODO: Integrate with property data APIs to pull comps and estimate ARV
+        conversation.customer_data["asking_price"] = user_input.strip()
         conversation.state = ConversationState.CONFIRMATION
-        
+
+        name = conversation.customer_data.get("name", "there")
         response_message = (
-            f"Excellent! I've scheduled your appointment for "
-            f"{conversation.customer_data.get('preferred_date')} "
-            f"at {user_input.strip()}. "
-            f"We'll see you then! Is there anything else I can help with?"
+            f"Perfect, {name}! I have everything I need. One of our acquisitions "
+            f"specialists will review your property details and reach out shortly "
+            f"with a cash offer. Thank you for calling ApexAcquisitions!"
         )
-        
-        logger.info(f"Appointment scheduled for: {conversation.customer_data}")
-        
+
+        logger.info(f"Lead qualified: {conversation.customer_data}")
+
         return ConversationResponse(
             message=response_message,
             next_action="listen",
             state=ConversationState.CONFIRMATION,
-            extracted_data={"preferred_time": user_input.strip()}
+            extracted_data={"asking_price": user_input.strip()}
         )
-    
+
     def end_conversation(self, call_id: str) -> Dict:
         """
         End conversation and save data
-        
+
         Args:
             call_id: Unique call identifier
-        
+
         Returns:
             Conversation summary
         """
         if call_id not in self.conversations:
             return {"status": "not_found"}
-        
+
         conversation = self.conversations[call_id]
         conversation.state = ConversationState.ENDED
         conversation.updated_at = datetime.now()
-        
+
         summary = {
             "call_id": call_id,
             "conversation_id": conversation.id,
@@ -421,24 +418,24 @@ class ConversationManager:
             "messages_count": len(conversation.messages),
             "status": "completed"
         }
-        
+
         logger.info(f"Conversation ended: {call_id}")
         # TODO: Save conversation data to database
-        
+
         return summary
-    
+
     def get_conversation_status(self, call_id: str) -> Optional[Dict]:
         """
         Get conversation status and details
-        
+
         Args:
             call_id: Unique call identifier
-        
+
         Returns:
             Conversation status or None if not found
         """
         if call_id not in self.conversations:
             return None
-        
+
         conversation = self.conversations[call_id]
         return conversation.to_dict()

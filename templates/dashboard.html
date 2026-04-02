@@ -1,36 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard - ApexAcquisitions{% endblock %}
 
 {% block content %}
 <section class="dashboard">
     <div class="container">
         <h1>Welcome, <span id="userName">...</span></h1>
-        <p class="subtitle">Here's your receptionist overview.</p>
+        <p class="subtitle">Your deal pipeline at a glance.</p>
 
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-value" id="statCalls">0</div>
-                <div class="stat-label">Conversations Today</div>
+                <div class="stat-value" id="statProperties">0</div>
+                <div class="stat-label">Properties Saved</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="statLeads">0</div>
-                <div class="stat-label">Leads Captured</div>
+                <div class="stat-value" id="statDeals">0</div>
+                <div class="stat-label">Active Deals</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="statAppts">0</div>
-                <div class="stat-label">Appointments Booked</div>
+                <div class="stat-value" id="statMatches">0</div>
+                <div class="stat-label">Investor Matches</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="statRate">--</div>
-                <div class="stat-label">Conversion Rate</div>
+                <div class="stat-value" id="statClosed">0</div>
+                <div class="stat-label">Deals Closed</div>
             </div>
         </div>
 
         <div class="dashboard-section">
             <h2>Quick Actions</h2>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                <a href="/chat" class="btn btn-primary">Open Live Chat</a>
-                <button class="btn btn-outline" onclick="loadProfile()">Refresh Profile</button>
+                <a href="/properties" class="btn btn-primary">Search Properties</a>
+                <a href="/deals" class="btn btn-outline">View Deals</a>
             </div>
         </div>
 
@@ -38,7 +38,7 @@
             <h2>Recent Activity</h2>
             <ul class="activity-list" id="activityList">
                 <li>
-                    <span>No recent activity yet. Start a conversation to see data here.</span>
+                    <span>No recent activity yet. Start by searching for properties.</span>
                 </li>
             </ul>
         </div>

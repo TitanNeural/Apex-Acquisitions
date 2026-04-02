@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Deals - ApexAcquisitions{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+    <div class="container">
+        <h1>Deal Pipeline</h1>
+        <p class="subtitle">Track your deals from lead to close.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Leads</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Under Contract</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Assigned</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Closed</div>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>Active Deals</h2>
+            <ul class="activity-list" id="dealsList">
+                <li><span>No active deals yet. Find a property and create your first deal.</span></li>
+            </ul>
+        </div>
+
+        <div style="margin-top:24px;">
+            <a href="/properties" class="btn btn-primary">Find Properties</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

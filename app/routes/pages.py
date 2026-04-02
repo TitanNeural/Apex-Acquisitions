@@ -30,6 +30,11 @@ def dashboard_page(request: Request):
     return templates.TemplateResponse(request, "dashboard.html")
 
 
-@router.get("/chat", response_class=HTMLResponse)
-def chat_page(request: Request):
-    return templates.TemplateResponse(request, "chat.html")
+@router.get("/properties", response_class=HTMLResponse)
+def properties_page(request: Request):
+    return templates.TemplateResponse(request, "properties.html")
+
+
+@router.get("/deals", response_class=HTMLResponse)
+def deals_page(request: Request):
+    return templates.TemplateResponse(request, "deals.html")

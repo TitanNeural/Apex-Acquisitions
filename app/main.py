@@ -1,5 +1,5 @@
 """
-FastAPI application entry point for AI Receptionist.
+FastAPI application entry point for ApexAcquisitions.
 """
 
 import os
@@ -20,7 +20,7 @@ init_db()
 
 
 app = FastAPI(
-    title=os.getenv("APP_NAME", "AI Receptionist"),
+    title=os.getenv("APP_NAME", "ApexAcquisitions"),
     version="1.0.0",
 )
 
@@ -43,4 +43,4 @@ app.include_router(conversation.router, prefix="/api/conversation", tags=["Conve
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "service": os.getenv("APP_NAME", "AI Receptionist")}
+    return {"status": "ok", "service": os.getenv("APP_NAME", "ApexAcquisitions")}

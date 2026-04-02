@@ -1,5 +1,5 @@
 """
-Models Package - Data models and schemas for AI Receptionist
+Models Package - Data models for ApexAcquisitions
 """
 
 from app.models.database import Base, engine, get_db, init_db, SessionLocal

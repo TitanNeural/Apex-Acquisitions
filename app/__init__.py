@@ -1,3 +1,3 @@
 """
-AI Receptionist - Intelligent virtual receptionist for auto service businesses.
+ApexAcquisitions - Real estate wholesaling and investment platform.
 """

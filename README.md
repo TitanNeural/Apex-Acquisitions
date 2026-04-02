@@ -1,126 +1,63 @@
-AI-Receptionist/
-│
-├─ app/
-│  ├─ __init__.py
-│  ├─ main.py
-│  ├─ routes/
-│  │  ├─ __init__.py
-│  │  └─ webhook.py
-│  ├─ services/
-│  │  ├─ __init__.py
-│  │  └─ conversation.py
-│  └─ models/
-│     ├─ __init__.py
-│     └─ schemas.py
-│
-├─ requirements.txt
-├─ .env.example
-└─ README.md
-fastapi
-uvicorn
-python-dotenv
-pydantic
-APP_NAME=AI Receptionist
-BUSINESS_NAME=ApexAcquisitions
-from fastapi import FastAPI
-from dotenv import load_dotenv
-import os
+# ApexAcquisitions
 
-from app.routes.webhook import router as webhook_router
+Real estate wholesaling and investment platform. Search distressed properties, manage your deal pipeline, match deals to cash buyers, and close faster.
 
-load_dotenv()
+## Features
 
-app = FastAPI(
-    title=os.getenv("APP_NAME", "AI Receptionist"),
-    version="1.0.0"
-)
+- **Property Search** - Find pre-foreclosures, tax liens, probate, vacant, and absentee-owner properties
+- **Deal Pipeline** - Track deals from lead to close with contracts and assignment fees
+- **Investor Matching** - Match deals to buyer buy boxes by location, price, strategy
+- **Contract Generation** - State-specific purchase agreements and assignment contracts
+- **Skip Tracing** - Find owner contact info from verified data sources
+- **User Auth** - Register, login, JWT-protected dashboard and settings
 
-app.include_router(webhook_router)
+## Quick Start
 
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-@app.get("/")
-def root():
-    return {
-        "message": f"{os.getenv('APP_NAME', 'AI Receptionist')} is running"
-    }from pydantic import BaseModel
-from typing import Optional
+Visit `http://localhost:8000`
 
+## Project Structure
 
-class CustomerMessage(BaseModel):
-    customer_name: Optional[str] = None
-    phone_number: Optional[str] = None
-    vehicle: Optional[str] = None
-    message: str
+```
+app/
+  main.py                  # FastAPI entry point
+  models/
+    database.py            # SQLAlchemy engine & session
+    user.py                # User & UserSettings models
+  schemas/
+    user.py                # Pydantic request/response schemas
+  routes/
+    auth.py                # /api/auth (register, login, profile, settings)
+    conversation.py        # /api/conversation (lead intake)
+    pages.py               # HTML page routes
+  services/
+    auth.py                # Password hashing & JWT tokens
+    conversation.py        # Lead qualification flow
+templates/                 # Jinja2 HTML templates
+static/                    # CSS & JS assets
+migrations/                # PostgreSQL SQL migrations
+```
 
+## Environment Variables
 
-class AIResponse(BaseModel):
-    response: str
-    next_step: str
-    import os
+```
+APP_NAME=ApexAcquisitions
+DATABASE_URL=postgresql://user:password@localhost:5432/apex_acquisitions
+SECRET_KEY=change-me-to-a-random-secret-key
+```
 
+## API Endpoints
 
-def generate_receptionist_response(message: str, customer_name: str | None = None) -> dict:
-    """
-    Simple starter conversation logic.
-    Later this can be replaced with OpenAI.
-    """
-    business_name = os.getenv("BUSINESS_NAME", "our shop")
-    msg = message.lower()
-
-    greeting_name = customer_name if customer_name else "there"
-
-    if any(word in msg for word in ["hello", "hi", "hey"]):
-        return {
-            "response": f"Thank you for calling {business_name}. This is Makayla. How can I help you today?",
-            "next_step": "collect_issue"
-        }
-
-    if any(word in msg for word in ["appointment", "schedule", "book"]):
-        return {
-            "response": (
-                f"Absolutely, {greeting_name}. I can help with that. "
-                "What kind of vehicle do you have, and what would you like us to look at?"
-            ),
-            "next_step": "collect_vehicle_and_issue"
-        }
-
-    if any(word in msg for word in ["brakes", "oil change", "check engine", "tire", "alignment", "battery"]):
-        return {
-            "response": (
-                "Got it. I can help get that scheduled. "
-                "Please provide your vehicle year, make, model, and the best phone number to reach you."
-            ),
-            "next_step": "collect_contact_info"
-        }
-
-    return {
-        "response": (
-            f"Thanks, {greeting_name}. I’m here to help with scheduling, vehicle concerns, and service questions. "
-            "Can you tell me what’s going on with your vehicle today?"
-        ),
-        "next_step": "collect_issue"
-    }
-    from fastapi import APIRouter
-from app.models.schemas import CustomerMessage, AIResponse
-from app.services.conversation import generate_receptionist_response
-
-router = APIRouter(prefix="/webhook", tags=["Webhook"])
-
-
-@router.post("/message", response_model=AIResponse)
-def handle_message(payload: CustomerMessage):
-    result = generate_receptionist_response(
-        message=payload.message,
-        customer_name=payload.customer_name
-    )
-
-    return AIResponse(
-        response=result["response"],
-        next_step=result["next_step"]
-    )
-    
-
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Get JWT token |
+| GET | `/api/auth/me` | Get profile |
+| PATCH | `/api/auth/me` | Update profile |
+| GET | `/api/auth/me/settings` | Get settings |
+| PATCH | `/api/auth/me/settings` | Update settings |
+| GET | `/api/health` | Health check |
