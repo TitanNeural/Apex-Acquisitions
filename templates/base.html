@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Receptionist{% endblock %} - EAS Tire & Auto</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="/" class="nav-brand">
+                <span class="brand-icon">&#9881;</span> EAS Tire & Auto
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/chat">Talk to Makayla</a>
+                <div id="authNav">
+                    <a href="/login" class="btn btn-outline btn-sm" id="loginBtn">Log In</a>
+                    <a href="/register" class="btn btn-primary btn-sm" id="registerBtn">Sign Up</a>
+                </div>
+                <div id="userNav" style="display:none;">
+                    <a href="/dashboard">Dashboard</a>
+                    <button class="btn btn-outline btn-sm" onclick="logout()">Log Out</button>
+                </div>
+            </div>
+            <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
+        </div>
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 EAS Tire & Auto. Powered by AI Receptionist.</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/auth.js"></script>
+    {% block scripts %}{% endblock %}
+    <script>
+        function toggleNav() {
+            document.getElementById('navLinks').classList.toggle('open');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+<section class="auth-page">
+    <div class="auth-card">
+        <h2>Create Account</h2>
+        <p class="subtitle">Start using your AI receptionist today</p>
+
+        <div class="alert alert-error" id="registerError"></div>
+        <div class="alert alert-success" id="registerSuccess"></div>
+
+        <form id="registerForm" onsubmit="handleRegister(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="firstName">First Name</label>
+                    <input type="text" id="firstName" class="form-control" placeholder="Jane" required>
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Last Name</label>
+                    <input type="text" id="lastName" class="form-control" placeholder="Doe" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" class="form-control" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone (optional)</label>
+                <input type="tel" id="phone" class="form-control" placeholder="(555) 123-4567">
+            </div>
+            <div class="form-group">
+                <label for="company">Company (optional)</label>
+                <input type="text" id="company" class="form-control" placeholder="Your business name">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" class="form-control" placeholder="Min 8 characters" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label for="role">I am a...</label>
+                <select id="role" class="form-control" required>
+                    <option value="wholesaler">Wholesaler</option>
+                    <option value="investor">Investor</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="registerSubmit">Create Account</button>
+        </form>
+
+        <p class="form-footer">
+            Already have an account? <a href="/login">Log in</a>
+        </p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function handleRegister(e) {
+    e.preventDefault();
+    const btn = document.getElementById('registerSubmit');
+    const errEl = document.getElementById('registerError');
+    const successEl = document.getElementById('registerSuccess');
+    errEl.style.display = 'none';
+    successEl.style.display = 'none';
+    btn.textContent = 'Creating account...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                first_name: document.getElementById('firstName').value,
+                last_name: document.getElementById('lastName').value,
+                phone: document.getElementById('phone').value || null,
+                company_name: document.getElementById('company').value || null,
+                role: document.getElementById('role').value
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Registration failed');
+        successEl.textContent = 'Account created! Redirecting to login...';
+        successEl.style.display = 'block';
+        setTimeout(() => window.location.href = '/login', 1500);
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+    } finally {
+        btn.textContent = 'Create Account';
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

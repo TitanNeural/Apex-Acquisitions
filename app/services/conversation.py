@@ -383,7 +383,7 @@ class ConversationManager:
         response_message = (
             f"Excellent! I've scheduled your appointment for "
             f"{conversation.customer_data.get('preferred_date')} "
-            f'at {user_input.strip()}. "
+            f"at {user_input.strip()}. "
             f"We'll see you then! Is there anything else I can help with?"
         )
         
